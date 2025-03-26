@@ -63,9 +63,9 @@ def generate_monthly_sentiment_summary(diaries, month, year):
                     sentiment_counts[label] = sentiment_counts.get(label, 0) + 1
             total_entries += 1
 
-    summary_parts = [f"{sentiment} : {count}일" for sentiment, count in sentiment_counts.items()]
+    summary_parts = [f"{sentiment} {count}일" for sentiment, count in sentiment_counts.items()]
     summary_text = ", ".join(summary_parts)
-    summary = f"{month}월에는 총 {total_entries}개의 일기 중 {summary_text} 감정을 기록했습니다."
+    summary = f"{month}월에는 총 {total_entries}개의 일기 중 {summary_text} 감정을 느꼈어."
     return summary
 
 def get_dominant_emotion(diaries):
