@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv() 
 
 DEBUG = True
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FIREBASE_CREDENTIALS_PATH = os.environ.get('FIREBASE_CREDENTIALS_PATH')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 EMAIL_FROM = os.environ.get('EMAIL_FROM')
