@@ -8,13 +8,13 @@ sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=token
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, BertForSequenceClassification
 
 # 모델 및 토크나이저 로드
-MODEL_NAME = "rkdaldus/ko-sent5-classification"
+MODEL_NAME = 'jeonghyeon97/koBERT-Senti5'
 # KoBERT 토크나이저는 "monologg/kobert"를 사용하며, trust_remote_code=True 옵션을 추가합니다.
 tokenizer = AutoTokenizer.from_pretrained("monologg/kobert", trust_remote_code=True)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+model = BertForSequenceClassification.from_pretrained(MODEL_NAME)
 
 def analyze_sentiment(text):
     """
@@ -52,11 +52,14 @@ def generate_monthly_sentiment_summary(diaries, month, year):
     total_entries = 0
 
     for diary in diaries:
+        title = diary.get("title", "제목 없음")
         content = diary.get("content", "")
         if content:
             results = analyze_sentiment(content)
             if results and isinstance(results, list):
                 label = results[0].get("label")
+                score = results[0].get("score")
+                print(f"[{title}] → 분석된 감정: {label} ({score:.2f})")
                 if label in sentiment_counts:
                     sentiment_counts[label] += 1
                 else:
