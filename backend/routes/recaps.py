@@ -29,6 +29,7 @@ def list_monthly_recaps():
                 "month": data.get("month"),
                 "year": data.get("year"),
                 "summary": data.get("summary"),
+                "top_words":data.get("top_words"),
                 "created_at": data.get("created_at")
             })
         return jsonify({"monthly_recaps": recap_list}), 200
