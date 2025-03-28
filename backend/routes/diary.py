@@ -106,12 +106,13 @@ def update_diary():
             return jsonify({"error": "권한이 없습니다."}), 403
 
         now = datetime.now(pytz.timezone('Asia/Seoul')).isoformat()
-
+      # update_timestamp = datetime.now(pytz.timezone('Asia/Seoul')).isoformat() #기존 timestamp + update ts
         # 일기 내용 업데이트 (새 제목, 내용, 날짜, 타임스탬프)
         update_data = {
             "title": new_title,
             "content": new_content,
             "timestamp": now
+          # "update_timestamp": update_timestamp #기존 timestamp + update ts
         }
         if new_date:
             update_data["date"] = new_date
@@ -133,7 +134,42 @@ def update_diary():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+    
+# 일기 삭제 
+@diary_bp.route('/delete_diary', methods=['POST'])
+def delete_diary():
+    """
+    일기 삭제 API:
+    클라이언트로부터 idToken과 diary_id를 받아 해당 일기 문서를 삭제합니다.
+    """
+    id_token = request.json.get('idToken')
+    diary_id = request.json.get('diary_id')
+    
+    if not id_token or not diary_id:
+        return jsonify({"error": "ID 토큰과 일기 ID가 필요합니다."}), 400
+    
+    try:
+        # Firebase 토큰 검증 및 사용자 uid 추출
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token.get("uid")
+        
+        # Firestore에서 해당 일기 문서 참조 가져오기
+        doc_ref = db.collection('diaries').document(diary_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({"error": "일기를 찾을 수 없습니다."}), 404
+        
+        data = doc.to_dict()
+        # 해당 일기가 요청한 사용자 것이 맞는지 확인
+        if data.get("uid") != uid:
+            return jsonify({"error": "권한이 없습니다."}), 403
+        
+        # 문서 삭제
+        doc_ref.delete()
+        
+        return jsonify({"message": "일기가 성공적으로 삭제되었습니다."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # backend/routes/diary.py 일기 제목/날짜 리스트업업
