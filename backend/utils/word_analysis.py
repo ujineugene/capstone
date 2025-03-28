@@ -32,4 +32,4 @@ def analyze_word_frequency(diaries, top_n=5):
     elif len(most_common_dict) == 1:
         return f"가장 많이 사용한 단어는 {most_common_dict[0]['word']}입니다."
     else:
-        return f"가장 많이 사용한 단어는 {most_common_dict[0]['word']}이고 두번째로 많이 사용한 단어는 {most_common_dict[1]['word']}야야."
+        return f"가장 많이 사용한 단어는 {most_common_dict[0]['word']}이고 두번째로 많이 사용한 단어는 {most_common_dict[1]['word']}야."
