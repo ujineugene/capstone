@@ -7,6 +7,7 @@ from firebase_admin import firestore
 from utils.sentiment_analysis import generate_monthly_sentiment_summary, get_dominant_emotion
 from utils.word_analysis import analyze_word_frequency
 from utils.monthly_letter import generate_monthly_letter
+from collections import Counter
 
 scheduler = BackgroundScheduler()
 
@@ -51,6 +52,7 @@ def run_monthly_recaps():
         name = user_data.get("name", "나")
         diaries = get_user_diaries_for_month(uid, month, year)
         if diaries:
+            '''
             summary = generate_monthly_sentiment_summary(diaries, month, year)
             top_words = analyze_word_frequency(diaries, top_n=5)
             recap_data = {
@@ -63,7 +65,54 @@ def run_monthly_recaps():
                 "created_at": now.isoformat()
             }
             db.collection('monthly_recaps').add(recap_data)
+    print("Monthly recaps generated at", now.isoformat())'''
+            # 각 일기에 저장된 감정 결과를 활용하여 집계합니다.
+            sentiment_counts = {"Angry": 0, "Fear": 0, "Happy": 0, "Tender": 0, "Sad": 0}
+            total_entries = 0
+            all_nouns = []
+            for diary in diaries:
+                # diary에 저장된 'sentiment' 필드가 존재한다면 사용
+                s = diary.get("sentiment")
+                if s and isinstance(s, list) and len(s) > 0:
+                    label = s[0].get("label")
+                    sentiment_counts[label] += 1
+                total_entries += 1
+                # diary에 저장된 'nouns' 필드를 합칩니다.
+                nouns = diary.get("nouns", [])
+                all_nouns.extend(nouns)
+            
+            # 감정 요약 문자열 생성
+            summary_parts = [f"{emotion} {count}일" for emotion, count in sentiment_counts.items()]
+            summary_text = ", ".join(summary_parts)
+            summary = f"{month}월에는 총 {total_entries}개의 일기 중 {summary_text} 감정을 기록했어."
+            
+            # 우세 감정 산출
+            dominant_emotion = max(sentiment_counts, key=sentiment_counts.get)
+            
+            # 단어 빈도 집계: 상위 3개 단어 선택
+            counter = Counter(all_nouns)
+            top_common = counter.most_common(3)
+            if len(top_common) == 0:
+                top_words_str = "일기에서 단어를 찾을 수 없습니다."
+            elif len(top_common) == 1:
+                top_words_str = f"가장 많이 사용한 단어는 {top_common[0][0]}입니다."
+            else:
+                top_words_str = (f"가장 많이 사용한 단어는 {top_common[0][0]}, "
+                                 f"두번째는 {top_common[1][0]}, "
+                                 f"세번째는 {top_common[2][0]}야.")
+            
+            recap_data = {
+                "uid": uid,
+                "name": name,
+                "month": month,
+                "year": year,
+                "summary": summary,
+                "top_words": top_words_str,
+                "created_at": now.isoformat()
+            }
+            db.collection('monthly_recaps').add(recap_data)
     print("Monthly recaps generated at", now.isoformat())
+
 
 def run_monthly_letters():
     """
@@ -73,7 +122,7 @@ def run_monthly_letters():
     """
     db = firestore.client()
     now = datetime.now(pytz.timezone('Asia/Seoul'))
-    month = now.month
+    month = now.monthㄴㄴ
     year = now.year
 
     users = db.collection('users').stream()
