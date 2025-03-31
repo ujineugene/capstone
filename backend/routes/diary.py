@@ -5,11 +5,33 @@ from datetime import datetime
 import pytz
 from utils.sentiment_analysis import analyze_sentiment  # 감정분석함수사용
 from konlpy.tag import Okt
-
+from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 diary_bp = Blueprint('diary_bp', __name__, url_prefix='')
 
 db = firestore.client()
 
+# 여기서부터
+# KoELECTRA 모델 로드
+model_name = "monologg/koelectra-base-v3-naver-ner"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForTokenClassification.from_pretrained(model_name)
+
+# NER 파이프라인 설정
+ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer)
+
+# NER 추출 함수
+def extract_entities(text):
+    ner_results = ner_pipeline(text)
+    
+    # Firestore에 저장 가능한 딕셔너리 형태로 변환
+    entities = [{"word": res["word"], "type": res["entity"]} for res in ner_results]
+    
+    return entities
+
+"""
+함수 create_diary() analyze_sentiment() analyze_word()
+변수  id_token, {date, titlecontent, now(timestamp)},-> diary_entry(일기정보 딕셔너리), {sentiment_result,nouns},-> analysis_data(분석결과 딕셔너리)
+"""
 @diary_bp.route('/diary', methods=['POST'])
 def create_diary():
     id_token = request.json.get('idToken')
@@ -39,39 +61,22 @@ def create_diary():
       
         okt = Okt()
         nouns = okt.nouns(content)   #단어명사분석
+        ner_results = extract_entities(content)
 
-        analysis_data={"sentiment" :sentiment_result ,"nouns":nouns}
+        analysis_data={"sentiment" :sentiment_result ,"nouns":nouns, "ner": ner_results}
 
         doc_ref.update(analysis_data)
 
         return jsonify({"message": "일기가 저장되고 분석 결과가 업데이트되었습니다."}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
-        '''
-        sentiment_result = analyze_sentiment(content)
 
-        okt = Okt()
-        nouns = okt.nouns(content)
 
-        diary_entry = {
-            "uid": uid,
-            "date": date,          # 사용자가 지정한 날짜 (YYYY-MM-DD)
-            "title": title,
-            "content": content,
-            "timestamp": now,      # 저장 시각
-            "sentiment" :sentiment_result ,
-            "nouns":nouns
-        }
+"""
+함수 update_diary() analyze_sentiment() analyze_word()
+변수 id_token, diary_id, {new_title, new_content, new_date, now },->update_data(딕셔너리),{sentiment_result,nouns},->analysis_data(딕셔너리)
 
-        db.collection('diaries').add(diary_entry) 
-        
-        return jsonify({"message": "일기가 저장되고 분석 결과가 업데이트되었습니다."}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500'''
-
-# backend/routes/diary.py
-
+"""
 #일기 수정 
 @diary_bp.route('/update_diary', methods=['POST'])
 def update_diary():
@@ -112,6 +117,7 @@ def update_diary():
             "title": new_title,
             "content": new_content,
             "timestamp": now
+            #"date":new_date 이거왜 코드없지.?
           # "update_timestamp": update_timestamp #기존 timestamp + update ts
         }
         if new_date:
@@ -135,7 +141,12 @@ def update_diary():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-# 일기 삭제 
+
+# 일기 삭제 엔드포인트
+"""
+ delete_diary(), 
+ 변수 id_token, diary_id
+"""
 @diary_bp.route('/delete_diary', methods=['POST'])
 def delete_diary():
     """
@@ -170,9 +181,12 @@ def delete_diary():
         return jsonify({"message": "일기가 성공적으로 삭제되었습니다."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-# backend/routes/diary.py 일기 제목/날짜 리스트업업
+    
+"""
+list_diaries()
+id_token, diary_list(리스트안딕셔너리형태),<-{diary_id, date, title}
+"""
+# backend/routes/diary.py 일기 제목/날짜 리스트업
 @diary_bp.route('/list_diaries', methods=['POST'])
 def list_diaries():
     id_token = request.json.get('idToken')
@@ -200,6 +214,11 @@ def list_diaries():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+"""
+get_diary_detail()
+id_token, diary_id, data(데이터베이스 일기정보)
+"""
 #제목 선택시 상세 일기 불러오기
 @diary_bp.route('/diary_detail', methods=['POST'])
 def get_diary_detail():
@@ -232,29 +251,3 @@ def get_diary_detail():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-'''
-# 날짜별 일기 조회 엔드포인트 한번에 모든걸 조회회
-@diary_bp.route('/get_diary_bydate', methods=['POST'])
-def get_diary_by_date():
-    id_token = request.json.get('idToken')
-    date_str = request.json.get('date')  # "YYYY-MM-DD"
-    if not id_token or not date_str:
-        return jsonify({"error": "ID 토큰과 날짜가 필요합니다."}), 400
-    try:
-        decoded_token = auth.verify_id_token(id_token)
-        uid = decoded_token['uid']
-        start_date = datetime.fromisoformat(date_str)
-        start_time = start_date.strftime("%Y-%m-%dT00:00:00")
-        end_date = start_date + timedelta(days=1)
-        end_time = end_date.strftime("%Y-%m-%dT00:00:00")
-        diaries_ref = db.collection('diaries')
-        query = diaries_ref.where("uid", "==", uid)\
-                           .where("timestamp", ">=", start_time)\
-                           .where("timestamp", "<", end_time)
-        diaries = query.stream()
-        diary_list = [diary.to_dict() for diary in diaries]
-        diary_list = sorted(diary_list, key=lambda x: x['timestamp'])
-        return jsonify({"diaries": diary_list}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-'''
