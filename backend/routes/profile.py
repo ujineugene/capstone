@@ -7,6 +7,11 @@ profile_bp = Blueprint('profile_bp', __name__, url_prefix='')
 
 db = firestore.client()
 
+# 회원정보 불러오기 엔드포인트
+'''
+함수 get_my_profile()
+변수 idToken, uid, user_data(firstore,딕셔너리)
+'''
 @profile_bp.route('/my_profile', methods=['POST'])
 def get_my_profile():
     id_token = request.json.get('idToken')
@@ -29,6 +34,11 @@ def get_my_profile():
         return jsonify({"error": str(e)}), 500
 
 
+#회원정보 수정 엔드포인트
+'''
+함수 update_profile()
+변수 idToken, new_name, new_email, update_data(딕셔너리)
+'''
 @profile_bp.route('/update_profile', methods=['POST'])
 def update_profile():
     """
